@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מחשבון קולי חכם</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Rubik -->
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Rubik', sans-serif;
+            background-color: #000000;
+            color: #ffffff;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #121212;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #27272a;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #3f3f46;
+        }
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 15px rgba(29, 185, 84, 0.4); }
+            50% { box-shadow: 0 0 30px rgba(29, 185, 84, 0.8); }
+        }
+        .listening-glow {
+            animation: pulse-glow 2s infinite;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-black text-white flex flex-col justify-between selection:bg-[#1DB954] selection:text-black">
+
+    <!-- Header -->
+    <header class="w-full border-b border-zinc-800 bg-zinc-950/80 backdrop-blur sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center space-x-3 space-x-reverse">
+            <div class="w-10 h-10 rounded-xl bg-[#1DB954]/20 border border-[#1DB954]/40 flex items-center justify-center text-[#1DB954]">
+                <i class="fa-solid fa-microphone-lines text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight text-white">מחשבון קולי חכם</h1>
+                <p class="text-xs text-zinc-400">הפעלה קולית מתקדמת בעברית (Web Speech API)</p>
+            </div>
+        </div>
+        <!-- Status Indicator -->
+        <div id="statusBadge" class="flex items-center space-x-2 space-x-reverse px-3 py-1.5 rounded-full bg-zinc-900 border border-zinc-800 text-xs font-medium">
+            <span id="statusDot" class="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block"></span>
+            <span id="statusText">מוכן להאדנה</span>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-4xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        
+        <!-- Calculator & Voice Panel (2 columns on lg) -->
+        <div class="lg:col-span-2 space-y-6">
+            
+            <!-- Display Screen Card -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-[#1DB954]/10 rounded-full blur-3xl pointer-events-none"></div>
+                <div class="absolute bottom-0 left-0 w-32 h-32 bg-[#D6DA3C]/10 rounded-full blur-3xl pointer-events-none"></div>
+
+                <!-- Current Expression -->
+                <div id="expressionDisplay" class="text-zinc-400 text-lg font-mono min-h-[1.75rem] text-left dir-ltr truncate">
+                    <!-- e.g. 234 / 5 -->
+                </div>
+
+                <!-- Main Result Display -->
+                <div class="mt-2 flex items-baseline justify-between">
+                    <span class="text-xs uppercase tracking-wider text-zinc-500 font-semibold">תוצאה</span>
+                    <div id="resultDisplay" class="text-5xl md:text-6xl font-bold text-[#1DB954] font-mono tracking-tight text-left dir-ltr">
+                        0
+                    </div>
+                </div>
+
+                <!-- Live Transcript Box -->
+                <div class="mt-6 pt-4 border-t border-zinc-800/80">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-medium text-zinc-400 flex items-center gap-1.5">
+                            <i class="fa-solid fa-ear-listen text-[#D6DA3C]"></i> זיהוי דיבור חי:
+                        </span>
+                        <span id="speechConfidence" class="text-[10px] text-zinc-500 font-mono"></span>
+                    </div>
+                    <div id="transcriptBox" class="bg-black/60 border border-zinc-800 rounded-xl p-3 text-sm text-zinc-300 font-mono min-h-[2.5rem] flex items-center">
+                        אמור תרגיל (למשל: "מאתיים שלושים וארבע לחלק לחמש שווה" או "שלוש עגבניות כפול ארבע מלפפונים שווה")...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Voice Control Action Card -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-base font-semibold text-white">שליטה קולית</h2>
+                    <p class="text-xs text-zinc-400 mt-0.5">לחץ להפעלה/כיבוי של המיקרופון, או אמור "תרגיל חדש" / "איפוס"</p>
+                </div>
+                <div class="flex items-center gap-3 w-full sm:w-auto">
+                    <button id="micToggleBtn" class="flex-1 sm:flex-none px-6 py-3.5 rounded-2xl bg-[#1DB954] hover:bg-[#1ed760] text-black font-bold flex items-center justify-center gap-2.5 transition-all shadow-lg shadow-[#1DB954]/20 active:scale-95 cursor-pointer">
+                        <i id="micIcon" class="fa-solid fa-microphone text-lg"></i>
+                        <span id="micButtonText">הפעל מיקרופון</span>
+                    </button>
+                    <button id="resetBtn" class="px-4 py-3.5 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium transition-all active:scale-95 cursor-pointer" title="איפוס">
+                        <i class="fa-solid fa-rotate-right"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Manual Fallback Keypad -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-semibold text-zinc-300">לוח מקשים ידני (גיבוי)</h3>
+                    <span class="text-xs text-zinc-500">ניתן ללחוץ בכל עת</span>
+                </div>
+                <div class="grid grid-cols-4 gap-3">
+                    <button onclick="appendManual('7')" class="p-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl font-mono text-lg font-bold transition active:scale-95">7</button>
+                    <button onclick="appendManual('8')" class="p-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl font-mono text-lg font-bold transition active:scale-95">8</button>
+                    <button onclick="appendManual('9')" class="p-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl font-mono text-lg font-bold transition active:scale-95">9</button>
+                    <button onclick="appendManual('/')" class="p-4 bg-zinc-800/60 hover:bg-[#D6DA3C]/20 text-[#D6DA3C] rounded-xl font-mono text-lg font-bold transition active:scale-95">÷</button>
+
+                    <button onclick="appendManual('4')" class="p-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl font-mono text-lg font-bold transition active:scale-95">4</button>
+                    <button onclick="appendManual('5')" class="p-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl font-mono text-lg font-bold transition active:scale-95">5</button>
+                    <button onclick="appendManual('6')" class="p-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl font-mono text-lg font-bold transition active:scale-95">6</button>
+                    <button onclick="appendManual('*')" class="p-4 bg-zinc-800/60 hover:bg-[#D6DA3C]/20 text-[#D6DA3C] rounded-xl font-mono text-lg font-bold transition active:scale-95">×</button>
+
+                    <button onclick="appendManual('1')" class="p-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl font-mono text-lg font-bold transition active:scale-95">1</button>
+                    <button onclick="appendManual('2')" class="p-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl font-mono text-lg font-bold transition active:scale-95">2</button>
+                    <button onclick="appendManual('3')" class="p-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl font-mono text-lg font-bold transition active:scale-95">3</button>
+                    <button onclick="appendManual('-')" class="p-4 bg-zinc-800/60 hover:bg-[#D6DA3C]/20 text-[#D6DA3C] rounded-xl font-mono text-lg font-bold transition active:scale-95">-</button>
+
+                    <button onclick="appendManual('0')" class="p-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl font-mono text-lg font-bold transition active:scale-95">0</button>
+                    <button onclick="appendManual('.')" class="p-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl font-mono text-lg font-bold transition active:scale-95">.</button>
+                    <button onclick="evaluateManual()" class="p-4 bg-[#1DB954] hover:bg-[#1ed760] text-black rounded-xl font-mono text-lg font-bold transition active:scale-95">=</button>
+                    <button onclick="appendManual('+')" class="p-4 bg-zinc-800/60 hover:bg-[#D6DA3C]/20 text-[#D6DA3C] rounded-xl font-mono text-lg font-bold transition active:scale-95">+</button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- History Log Panel (1 column on lg) -->
+        <div class="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 flex flex-col h-[600px] lg:h-auto lg:sticky lg:top-24">
+            <div class="flex items-center justify-between pb-4 border-b border-zinc-800">
+                <h3 class="font-semibold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-clock-rotate-left text-[#1DB954]"></i> היסטוריית חישובים
+                </h3>
+                <button onclick="clearHistory()" class="text-xs text-zinc-400 hover:text-white transition">נקה היסטוריה</button>
+            </div>
+            <div id="historyList" class="flex-1 overflow-y-auto mt-4 space-y-3 pr-1">
+                <div class="text-center text-zinc-500 text-xs py-8">אין עדיין חישובים בהיסטוריה</div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="w-full border-t border-zinc-800 py-4 text-center text-xs text-zinc-500 bg-zinc-950">
+        מחשבון קולי חכם • מותאם לעברית עם סינון רעשים חכם
+    </footer>
+
+    <!-- Browser Support Modal / Notification Box -->
+    <div id="msgModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 max-w-md w-full text-center space-y-4">
+            <div id="msgIcon" class="w-12 h-12 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center mx-auto text-xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 id="msgTitle" class="text-lg font-bold text-white">הודעה</h3>
+            <p id="msgBody" class="text-sm text-zinc-300"></p>
+            <button onclick="closeModal()" class="w-full py-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl font-medium transition">אישור</button>
+        </div>
+    </div>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // State management
+        let isListening = false;
+        let recognition = null;
+        let lastResult = null;
+        let currentExpressionBuffer = "";
+        let history = [];
+
+        // DOM Elements
+        const micToggleBtn = document.getElementById('micToggleBtn');
+        const micIcon = document.getElementById('micIcon');
+        const micButtonText = document.getElementById('micButtonText');
+        const statusBadge = document.getElementById('statusBadge');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const transcriptBox = document.getElementById('transcriptBox');
+        const expressionDisplay = document.getElementById('expressionDisplay');
+        const resultDisplay = document.getElementById('resultDisplay');
+        const historyList = document.getElementById('historyList');
+        const speechConfidence = document.getElementById('speechConfidence');
+
+        // Initialize Speech Recognition
+        function initSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                showModal("שגיאת דפדפן", "הדפדפן שלך אינו תומך ב-Web Speech API. מומלץ להשתמש ב-Google Chrome. ניתן להשתמש בלוח המקשים הידני.", "error");
+                micToggleBtn.disabled = true;
+                micToggleBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                return false;
+            }
+
+            recognition = new SpeechRecognition();
+            recognition.lang = 'he-IL';
+            recognition.continuous = true;
+            recognition.interimResults = true;
+
+            recognition.onstart = () => {
+                isListening = true;
+                updateUIState(true);
+            };
+
+            recognition.onresult = (event) => {
+                let interimTranscript = '';
+                let finalTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    const transcriptPiece = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcriptPiece;
+                    } else {
+                        interimTranscript += transcriptPiece;
+                    }
+                }
+
+                if (interimTranscript) {
+                    transcriptBox.textContent = interimTranscript;
+                }
+
+                if (finalTranscript) {
+                    transcriptBox.textContent = finalTranscript;
+                    if (event.results[event.results.length - 1][0].confidence) {
+                        const conf = Math.round(event.results[event.results.length - 1][0].confidence * 100);
+                        speechConfidence.textContent = `דיוק: ${conf}%`;
+                    }
+                    processVoiceInput(finalTranscript);
+                }
+            };
+
+            recognition.onerror = (event) => {
+                console.error("Speech recognition error:", event.error);
+                if (event.error === 'not-allowed') {
+                    showModal("גישה נדחתה", "אנא אפשר גישה למיקרופון בהגדרות הדפדפן.", "error");
+                    stopListening();
+                }
+            };
+
+            recognition.onend = () => {
+                if (isListening) {
+                    try {
+                        recognition.start();
+                    } catch (e) {
+                        console.error(e);
+                    }
+                } else {
+                    updateUIState(false);
+                }
+            };
+
+            return true;
+        }
+
+        function toggleListening() {
+            if (!recognition) {
+                if (!initSpeechRecognition()) return;
+            }
+
+            if (isListening) {
+                stopListening();
+            } else {
+                startListening();
+            }
+        }
+
+        function startListening() {
+            try {
+                recognition.start();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function stopListening() {
+            isListening = false;
+            if (recognition) {
+                try {
+                    recognition.stop();
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+            updateUIState(false);
+        }
+
+        function updateUIState(listening) {
+            if (listening) {
+                micToggleBtn.classList.remove('bg-[#1DB954]', 'hover:bg-[#1ed760]');
+                micToggleBtn.classList.add('bg-red-600', 'hover:bg-red-500', 'listening-glow');
+                micIcon.className = "fa-solid fa-microphone-slash text-lg";
+                micButtonText.textContent = "הפסק האזנה";
+                statusDot.className = "w-2.5 h-2.5 rounded-full bg-[#1DB954] inline-block animate-pulse";
+                statusText.textContent = "מאזין כעת...";
+            } else {
+                micToggleBtn.classList.remove('bg-red-600', 'hover:bg-red-500', 'listening-glow');
+                micToggleBtn.classList.add('bg-[#1DB954]', 'hover:bg-[#1ed760]');
+                micIcon.className = "fa-solid fa-microphone text-lg";
+                micButtonText.textContent = "הפעל מיקרופון";
+                statusDot.className = "w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block";
+                statusText.textContent = "מוכן להאזנה";
+            }
+        }
+
+        // Hebrew Number & Keyword Parser
+        const unitMap = {
+            'אחת': 1, 'אחד': 1, 'שתיים': 2, 'שניים': 2, 'שלוש': 3, 'שלשה': 3, 'ארבע': 4, 'חמש': 5, 'שש': 6, 'שבע': 7, 'שמונה': 8, 'תשע': 9
+        };
+        const tenMap = {
+            'עשרים': 20, 'שלושים': 30, 'ארבעים': 40, 'חמישים': 50, 'שישים': 60, 'שבעים': 70, 'שמונים': 80, 'תשעים': 90
+        };
+        const hundredMap = {
+            'מאה': 100, 'מאתיים': 200, 'שלוש מאות': 300, 'ארבע מאות': 400, 'חמש מאות': 500, 'שש מאות': 600, 'שבע מאות': 700, 'שמונה מאות': 800, 'תשע מאות': 900
+        };
+        const thousandMap = {
+            'אלף': 1000, 'אלפיים': 2000, 'שלושת אלפים': 3000, 'ארבעת אלפים': 4000, 'חמשת אלפים': 5000
+        };
+
+        function parseHebrewToTokens(text) {
+            text = text.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, " ").trim();
+            const words = text.split(/\s+/);
+            let tokens = [];
+            let i = 0;
+
+            while (i < words.length) {
+                let w = words[i];
+
+                // Check reset keywords
+                if (w === 'איפוס' || (w === 'תרגיל' && words[i+1] === 'חדש')) {
+                    tokens.push({ type: 'RESET' });
+                    if (w === 'תרגיל') i++;
+                    i++;
+                    continue;
+                }
+
+                // Check equals
+                if (w === 'שווה' || w === '=') {
+                    tokens.push({ type: 'EQUALS' });
+                    i++;
+                    continue;
+                }
+
+                // Operators
+                if (w === 'ועוד' || w === 'פלוס' || w === '+') {
+                    tokens.push({ type: 'OP', val: '+' });
+                    i++;
+                    continue;
+                }
+                if (w === 'פחות' || w === '-') {
+                    tokens.push({ type: 'OP', val: '-' });
+                    i++;
+                    continue;
+                }
+                if (w === 'כפול' || w === '*' || w === 'פעמים') {
+                    tokens.push({ type: 'OP', val: '*' });
+                    i++;
+                    continue;
+                }
+                if (w === 'לחלק' || w === 'חלקי' || w === '/') {
+                    tokens.push({ type: 'OP', val: '/' });
+                    i++;
+                    continue;
+                }
+
+                // Digits
+                if (!isNaN(w)) {
+                    tokens.push({ type: 'NUM', val: parseFloat(w) });
+                    i++;
+                    continue;
+                }
+
+                // Hebrew number words parsing with noise resilience
+                let cleanW = w.startsWith('וו') ? w.substring(2) : (w.startsWith('ו') && w.length > 1 ? w.substring(1) : w);
+                let numVal = 0;
+                let matchedNum = false;
+
+                if (thousandMap[cleanW]) {
+                    numVal += thousandMap[cleanW];
+                    matchedNum = true;
+                    i++;
+                } else if (hundredMap[cleanW]) {
+                    numVal += hundredMap[cleanW];
+                    matchedNum = true;
+                    i++;
+                } else if (tenMap[cleanW]) {
+                    numVal += tenMap[cleanW];
+                    matchedNum = true;
+                    i++;
+                } else if (unitMap[cleanW]) {
+                    numVal += unitMap[cleanW];
+                    matchedNum = true;
+                    i++;
+                } else if (cleanW === 'עשר' || cleanW === 'עשרה') {
+                    numVal += 10;
+                    matchedNum = true;
+                    i++;
+                }
+
+                if (matchedNum) {
+                    // Check compound numbers e.g. עשרים וחמש
+                    while (i < words.length) {
+                        let nextW = words[i];
+                        let cleanNext = nextW.startsWith('ו') && nextW.length > 1 ? nextW.substring(1) : nextW;
+                        let nextVal = unitMap[cleanNext] || tenMap[cleanNext] || hundredMap[cleanNext] || 0;
+                        if (nextVal > 0 && nextVal < numVal) {
+                            numVal += nextVal;
+                            i++;
+                        } else {
+                            break;
+                        }
+                    }
+                    tokens.push({ type: 'NUM', val: numVal });
+                } else {
+                    // Ignore noise words (e.g. עגבניות, מלפפונים, את, של)
+                    i++;
+                }
+            }
+
+            return tokens;
+        }
+
+        function processVoiceInput(transcript) {
+            const tokens = parseHebrewToTokens(transcript);
+            
+            for (let token of tokens) {
+                if (token.type === 'RESET') {
+                    resetCalculator();
+                    return;
+                }
+                if (token.type === 'NUM' || token.type === 'OP') {
+                    // Check if chained operation: if buffer is empty and lastResult exists, and new token is an OP
+                    if (currentExpressionBuffer === "" && lastResult !== null && token.type === 'OP') {
+                        currentExpressionBuffer = `${lastResult} ${token.val}`;
+                    } else if (currentExpressionBuffer === "" && lastResult !== null && token.type === 'NUM') {
+                        // If user stated number without operator right after calculation, start fresh or reset
+                        currentExpressionBuffer = `${token.val}`;
+                        lastResult = null;
+                    } else {
+                        currentExpressionBuffer += (currentExpressionBuffer === "" ? "" : " ") + token.val;
+                    }
+                    expressionDisplay.textContent = currentExpressionBuffer;
+                }
+                if (token.type === 'EQUALS') {
+                    executeCalculation();
+                    return;
+                }
+            }
+        }
+
+        function executeCalculation() {
+            if (!currentExpressionBuffer.trim()) return;
+
+            try {
+                // Safe evaluation using Function
+                // Sanitize string to allow only numbers and basic operators
+                const sanitized = currentExpressionBuffer.replace(/[^0-9+\-*/.]/g, '');
+                if (!sanitized) return;
+
+                const evalResult = Function(`'use strict'; return (${sanitized})`)();
+                
+                if (!isFinite(evalResult)) {
+                    throw new Error("חלוקה באפס");
+                }
+
+                const formattedResult = Number.isInteger(evalResult) ? evalResult : parseFloat(evalResult.toFixed(4));
+                
+                // Add to history
+                addToHistory(currentExpressionBuffer + " = " + formattedResult);
+
+                // Update UI
+                expressionDisplay.textContent = currentExpressionBuffer + " =";
+                resultDisplay.textContent = formattedResult;
+
+                // Save last result and clear input buffer for chained operations
+                lastResult = formattedResult;
+                currentExpressionBuffer = "";
+
+            } catch (err) {
+                resultDisplay.textContent = "שגיאה בחישוב";
+                console.error(err);
+            }
+        }
+
+        function resetCalculator() {
+            lastResult = null;
+            currentExpressionBuffer = "";
+            expressionDisplay.textContent = "";
+            resultDisplay.textContent = "0";
+            transcriptBox.textContent = "אפוס. מוכן לתרגיל חדש...";
+            speechConfidence.textContent = "";
+        }
+
+        // Manual Keypad Fallback
+        function appendManual(val) {
+            currentExpressionBuffer += val;
+            expressionDisplay.textContent = currentExpressionBuffer;
+        }
+
+        function evaluateManual() {
+            executeCalculation();
+        }
+
+        function addToHistory(item) {
+            if (history.length === 0) {
+                historyList.innerHTML = "";
+            }
+            history.unshift(item);
+            if (history.length > 20) history.pop();
+
+            renderHistory();
+        }
+
+        function renderHistory() {
+            if (history.length === 0) {
+                historyList.innerHTML = `<div class="text-center text-zinc-500 text-xs py-8">אין עדיין חישובים בהיסטוריה</div>`;
+                return;
+            }
+            historyList.innerHTML = history.map(h => `
+                <div class="bg-black/40 border border-zinc-800/80 rounded-xl p-3 flex items-center justify-between font-mono text-sm text-zinc-200">
+                    <span dir="ltr">${h}</span>
+                    <i class="fa-solid fa-check text-[#1DB954] text-xs"></i>
+                </div>
+            `).join('');
+        }
+
+        function clearHistory() {
+            history = [];
+            renderHistory();
+        }
+
+        // Modal helpers
+        function showModal(title, body, type = "info") {
+            document.getElementById('msgTitle').textContent = title;
+            document.getElementById('msgBody').textContent = body;
+            const iconDiv = document.getElementById('msgIcon');
+            if (type === "error") {
+                iconDiv.className = "w-12 h-12 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center mx-auto text-xl";
+                iconDiv.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i>';
+            } else {
+                iconDiv.className = "w-12 h-12 rounded-full bg-[#1DB954]/20 text-[#1DB954] flex items-center justify-center mx-auto text-xl";
+                iconDiv.innerHTML = '<i class="fa-solid fa-circle-info"></i>';
+            }
+            document.getElementById('msgModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('msgModal').classList.add('hidden');
+        }
+
+        // Event listeners
+        micToggleBtn.addEventListener('click', toggleListening);
+        document.getElementById('resetBtn').addEventListener('click', resetCalculator);
+
+        // Pre-initialize recognition check on load
+        window.onload = () => {
+            initSpeechRecognition();
+        };
+    </script>
+</body>
+</html>
